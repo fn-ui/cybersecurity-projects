@@ -11,6 +11,26 @@ files_to_monitor = [
 
 stored_hashes = {}
 
+
+def create_baseline():
+    with open("baseline.txt", "w") as baseline:
+        for filename in files_to_monitor:
+            if os.path.exists(filename):
+
+                with open(filename, "r") as file:
+                    content = file.read()
+
+                file_hash = hashlib.sha256(
+                    content.encode()
+                ).hexdigest()
+
+                baseline.write(
+                    f"{filename}:{file_hash}\n"
+                )
+
+    print("✅ Baseline created successfully.")
+
+
 def update_baseline(filename, new_hash):
     stored_hashes[filename] = new_hash
 
@@ -20,17 +40,27 @@ def update_baseline(filename, new_hash):
 
     print(f"✅ Baseline updated for {filename}")
 
+
+# Create baseline automatically if missing
+if not os.path.exists("baseline.txt"):
+    print("⚠️ baseline.txt not found.")
+    print("Creating baseline automatically...")
+    create_baseline()
+
+
 # Load baseline hashes
 with open("baseline.txt", "r") as baseline:
     for line in baseline:
         filename, baseline_hash = line.strip().split(":")
         stored_hashes[filename] = baseline_hash
 
-#prevent repeated alerts for the same file
+
+# Prevent repeated alerts for the same new file
 detected_new_files = set()
 
 print("File Integrity Monitor is running...")
 print("Press CTRL + C to stop the program.\n")
+
 
 while True:
 
@@ -38,23 +68,27 @@ while True:
 
     print("\nChecking file integrity...")
 
-    # Check each file
+    # Check monitored files
     for filename in files_to_monitor:
-        #check if the file exists
+
+        # Detect deleted files
         if not os.path.exists(filename):
             modified_files += 1
 
-            print(f"⚠️ {filename} has been deleted!")
+            print(f"❌ {filename} has been deleted!")
 
             timestamp = datetime.now().strftime(
                 "%Y-%m-%d %H:%M:%S"
             )
+
             with open("security_log.txt", "a") as log_file:
                 log_file.write(
-                    f"{timestamp} [CRITICAL] {filename} has been deleted!\n"
+                    f"{timestamp} [CRITICAL] {filename} was deleted.\n"
                 )
+
             continue
 
+        # Read file content
         with open(filename, "r") as file:
             content = file.read()
 
@@ -66,7 +100,8 @@ while True:
             "%Y-%m-%d %H:%M:%S"
         )
 
-        if current_hash == stored_hashes[filename]:
+        # Compare with baseline
+        if current_hash == stored_hashes.get(filename):
 
             print(f"✅ {filename} is unchanged.")
 
@@ -84,19 +119,20 @@ while True:
                 log_file.write(
                     f"{timestamp} [WARNING] Integrity violation detected in {filename}\n"
                 )
+
             choice = input(
-               f"Do you trust the new version of {filename}? (y/n): "
+                f"Do you trust the new version of {filename}? (y/n): "
             ).lower()
 
             if choice == "y":
-               update_baseline(filename, current_hash)
+                update_baseline(filename, current_hash)
 
-               with open("security_log.txt", "a") as log_file:
-                  log_file.write(
-                   f"{timestamp} [INFO] Baseline updated for {filename}\n"
-            )
+                with open("security_log.txt", "a") as log_file:
+                    log_file.write(
+                        f"{timestamp} [INFO] Baseline updated for {filename}\n"
+                    )
 
-    #detect new files
+    # Detect new files
     current_files = os.listdir(".")
 
     for file in current_files:
@@ -107,6 +143,7 @@ while True:
             and file not in ["baseline.txt", "security_log.txt"]
             and file not in detected_new_files
         ):
+
             detected_new_files.add(file)
 
             print(f"🆕 New file detected: {file}")
@@ -120,10 +157,7 @@ while True:
                     f"{timestamp} [WARNING] New file detected: {file}\n"
                 )
 
-            
-        
-
-    # Detect multiple file changes
+    # Detect multiple violations
     if modified_files >= 2:
 
         timestamp = datetime.now().strftime(
