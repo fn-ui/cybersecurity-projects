@@ -1,0 +1,14 @@
+{
+    "monitored_folder": "monitored_files",
+    "scan_interval": 10,
+    "dangerous_extensions": [
+        ".exe",
+        ".bat",
+        ".ps1",
+        ".vbs",
+        ".dll",
+        ".js",
+        ".scr",
+        ".cmd"
+    ]
+}
